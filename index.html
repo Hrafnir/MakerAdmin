@@ -1,162 +1,183 @@
-<!-- Version: #1 -->
+<!-- Version: #8 -->
 <!DOCTYPE html>
 <html lang="no">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Makerspace Ressurskontroll</title>
-<link rel="stylesheet" href="style.css">
-<!-- Google Material Icons for UI -->
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Makerspace Ressurskontroll</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Material Icons for UI -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-code
-Code
-<!-- App-beholder -->
-<div id="app">
-    
-    <!-- Toppmeny / Navigasjon -->
-    <header id="main-header" class="hidden">
-        <div class="logo">
-            <span class="material-icons">build</span>
-            <h1>Makerspace Admin</h1>
-        </div>
-        <nav>
-            <button onclick="app.showSection('log-use')" title="Logg bruk">
-                <span class="material-icons">add_circle</span>
-            </button>
-            <button onclick="app.showSection('inventory')" title="Lagerbeholdning">
-                <span class="material-icons">inventory_2</span>
-            </button>
-            <button onclick="app.showSection('stats')" title="Statistikk">
-                <span class="material-icons">bar_chart</span>
-            </button>
-            <button id="logout-btn" title="Logg ut">
-                <span class="material-icons">logout</span>
-            </button>
-        </nav>
-    </header>
 
-    <main>
-        <!-- Seksjon 1: Autentisering -->
-        <section id="auth-section" class="card">
-            <h2>Velkommen til Makerspace</h2>
-            <p>Logg inn for å bruke utstyr og se lagerstatus.</p>
-            <div id="auth-container">
-                <!-- Firebase UI / Custom Auth knapper -->
-                <button id="google-login-btn" class="btn-primary">
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
-                    Logg inn med Google
+    <!-- App-beholder -->
+    <div id="app">
+        
+        <!-- Toppmeny / Navigasjon -->
+        <header id="main-header" class="hidden">
+            <div class="logo">
+                <span class="material-icons">build</span>
+                <h1>Makerspace Admin</h1>
+            </div>
+            <nav>
+                <button onclick="app.showSection('log-use')" title="Logg bruk">
+                    <span class="material-icons">add_circle</span>
                 </button>
+                <button onclick="app.showSection('inventory')" title="Lagerbeholdning">
+                    <span class="material-icons">inventory_2</span>
+                </button>
+                <button onclick="app.showSection('stats')" title="Statistikk">
+                    <span class="material-icons">bar_chart</span>
+                </button>
+                <button id="logout-btn" title="Logg ut">
+                    <span class="material-icons">logout</span>
+                </button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- Seksjon 1: Autentisering (E-post, Passord og Google) -->
+            <section id="auth-section" class="card">
+                <h2 id="auth-title">Logg inn</h2>
+                <p id="auth-desc">Logg inn for å bruke utstyr og se lagerstatus.</p>
+                
+                <div id="auth-container">
+                    <!-- E-post og Passord Skjema -->
+                    <form id="email-auth-form">
+                        <div class="form-group">
+                            <label for="auth-email">E-postadresse</label>
+                            <input type="email" id="auth-email" placeholder="navn@epost.no" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="auth-password">Passord</label>
+                            <input type="password" id="auth-password" placeholder="Ditt passord" required>
+                        </div>
+                        
+                        <div class="auth-buttons" style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button type="submit" id="login-email-btn" class="btn-primary" style="flex: 1;">Logg inn</button>
+                            <button type="button" id="signup-email-btn" class="btn-secondary" style="flex: 1;">Opprett bruker</button>
+                        </div>
+                    </form>
+
+                    <div style="text-align: center; margin: 20px 0; color: #666; position: relative;">
+                        <hr style="border: 0; border-top: 1px solid #ddd;">
+                        <span style="background: #fff; padding: 0 10px; position: relative; top: -12px;">eller</span>
+                    </div>
+
+                    <!-- Google Login -->
+                    <button id="google-login-btn" class="btn-primary" style="background-color: #fff; color: #757575; border: 1px solid #ddd;">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width: 18px; margin-right: 10px;">
+                        Fortsett med Google
+                    </button>
+                </div>
+            </section>
+
+            <!-- Seksjon 2: Logg Bruk (Hovedfunksjon) -->
+            <section id="log-use-section" class="hidden section-content">
+                <h2>Logg Bruk</h2>
+                <form id="usage-form">
+                    <div class="form-group">
+                        <label for="machine-select">Velg Maskin:</label>
+                        <select id="machine-select" required>
+                            <option value="">Laster maskiner...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="material-select">Velg Materiale:</label>
+                        <select id="material-select" required>
+                            <option value="">Laster materialer...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="amount-input">Mengde (gram/stk/mm²):</label>
+                        <input type="number" id="amount-input" step="0.1" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="time-input">Tid brukt (minutter):</label>
+                        <input type="number" id="time-input" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="own-material-check"> Jeg bruker eget materiale
+                        </label>
+                    </div>
+
+                    <div id="price-preview" class="price-box">
+                        Pris: <span id="calculated-price">0,00</span> kr
+                    </div>
+
+                    <button type="submit" class="btn-success">Registrer Bruk & Vis Vipps</button>
+                </form>
+            </section>
+
+            <!-- Seksjon 3: Lagerbeholdning -->
+            <section id="inventory-section" class="hidden section-content">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>Lagerbeholdning</h2>
+                    <button id="add-material-btn" class="btn-secondary btn-small">Legg til materiale</button>
+                </div>
+                <div class="table-container">
+                    <table id="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Materiale</th>
+                                <th>Lager</th>
+                                <th>Pris (M/D)</th>
+                                <th>Status</th>
+                                <th>Handlinger</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-body">
+                            <!-- Fylles dynamisk fra JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <button id="export-csv-btn" class="btn-secondary">Last ned som Regneark (CSV)</button>
+            </section>
+
+            <!-- Seksjon 4: Statistikk -->
+            <section id="stats-section" class="hidden section-content">
+                <h2>Brukshistorikk</h2>
+                <div id="stats-summary" class="stats-grid" style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div class="stat-card" style="background: #f1f1f1; padding: 15px; border-radius: 8px; text-align: center;">
+                        <span class="label" style="display: block; font-size: 0.9rem; color: #666;">Totalt registrert forbruk</span>
+                        <span class="value" id="stat-total-use" style="font-size: 1.5rem; font-weight: bold;">0,00 kr</span>
+                    </div>
+                </div>
+                <div id="logs-list">
+                    <!-- Liste over de siste loggene -->
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Vipps Modal -->
+        <div id="vipps-modal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h3>Betaling med Vipps</h3>
+                <div id="vipps-qr-container">
+                    <p>Betal til Makerspace:</p>
+                    <div class="vipps-amount" id="modal-amount">0 kr</div>
+                    <div class="vipps-code" style="background: #eee; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace;">Vipps-nummer: 123456</div>
+                </div>
+                <button id="confirm-payment-btn" class="btn-success">Jeg har betalt i Vipps-appen</button>
             </div>
-        </section>
-
-        <!-- Seksjon 2: Logg Bruk (Hovedfunksjon) -->
-        <section id="log-use-section" class="hidden section-content">
-            <h2>Logg Bruk</h2>
-            <form id="usage-form">
-                <div class="form-group">
-                    <label for="machine-select">Velg Maskin:</label>
-                    <select id="machine-select" required>
-                        <option value="">Laster maskiner...</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="material-select">Velg Materiale:</label>
-                    <select id="material-select" required>
-                        <option value="">Laster materialer...</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="amount-input">Mengde (gram/stk/mm²):</label>
-                    <input type="number" id="amount-input" step="0.1" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="time-input">Tid brukt (minutter):</label>
-                    <input type="number" id="time-input" required>
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="own-material-check"> Jeg bruker eget materiale
-                    </label>
-                </div>
-
-                <div id="price-preview" class="price-box">
-                    Pris: <span id="calculated-price">0,00</span> kr
-                </div>
-
-                <button type="submit" class="btn-success">Registrer Bruk & Vis Vipps</button>
-            </form>
-        </section>
-
-        <!-- Seksjon 3: Lagerbeholdning -->
-        <section id="inventory-section" class="hidden section-content">
-            <div class="section-header">
-                <h2>Lagerbeholdning</h2>
-                <button id="add-material-btn" class="btn-small">Legg til materiale</button>
-            </div>
-            <div class="table-container">
-                <table id="inventory-table">
-                    <thead>
-                        <tr>
-                            <th>Materiale</th>
-                            <th>Lager</th>
-                            <th>Pris (M/D)</th>
-                            <th>Status</th>
-                            <th>Handlinger</th>
-                        </tr>
-                    </thead>
-                    <tbody id="inventory-body">
-                        <!-- Fylles dynamisk fra JS -->
-                    </tbody>
-                </table>
-            </div>
-            <button id="export-csv-btn" class="btn-secondary">Last ned som Regneark (CSV)</button>
-        </section>
-
-        <!-- Seksjon 4: Statistikk og Admin -->
-        <section id="stats-section" class="hidden section-content">
-            <h2>Brukshistorikk og Statistikk</h2>
-            <div id="stats-summary" class="stats-grid">
-                <div class="stat-card">
-                    <span class="label">Totalt forbruk</span>
-                    <span class="value" id="stat-total-use">0</span>
-                </div>
-                <!-- Flere stat-kort kommer -->
-            </div>
-            <div id="logs-list">
-                <!-- Liste over de siste loggene -->
-            </div>
-        </section>
-
-    </main>
-
-    <!-- Vipps Modal (Popup for betaling) -->
-    <div id="vipps-modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h3>Betaling med Vipps</h3>
-            <div id="vipps-qr-container">
-                <!-- Her kan vi generere en QR-kode eller lenke -->
-                <p>Skann koden eller bruk nummeret under:</p>
-                <div class="vipps-amount" id="modal-amount">0 kr</div>
-                <div class="vipps-code">Vipps-nummer: 123456</div>
-            </div>
-            <button id="confirm-payment-btn" class="btn-primary">Jeg har betalt</button>
         </div>
+
+        <footer id="main-footer">
+            <p>&copy; 2024 Makerspace System - Versjon 8</p>
+        </footer>
     </div>
 
-    <footer id="main-footer">
-        <p>&copy; 2024 Makerspace System - Versjon 1</p>
-    </footer>
-</div>
+    <!-- Firebase SDK -->
+    <script type="module" src="script.js"></script>
 
-<!-- Firebase SDK (Modular) -->
-<script type="module" src="script.js"></script>
 </body>
 </html>
-<!-- Version: #1 -->
+<!-- Version: #8 -->
