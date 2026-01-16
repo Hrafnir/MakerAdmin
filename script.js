@@ -1,4 +1,4 @@
-/* Version: #7 */
+/* Version: #9 */
 
 import { firebaseConfig } from "./config.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -7,7 +7,9 @@ import {
     signInWithPopup, 
     GoogleAuthProvider, 
     onAuthStateChanged, 
-    signOut 
+    signOut,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { 
     getFirestore, 
@@ -22,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // === INITIALISERING ===
-console.log("[System] Initialiserer Firebase Versjon #7...");
+console.log("[System] Initialiserer Firebase Versjon #9...");
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -32,7 +34,7 @@ const provider = new GoogleAuthProvider();
 let currentUser = null;
 let materials = [];
 let machines = [];
-let currentPendingUsage = null; // Lagrer data midlertidig mens vi venter på Vipps-bekreftelse
+let currentPendingUsage = null;
 
 // === APP LOGIKK ===
 window.app = {
@@ -50,7 +52,32 @@ window.app = {
         }
     },
 
-    // Henting av data (Lager og Maskiner)
+    // Autentisering - E-post/Passord Logikk
+    handleEmailAuth: async (type) => {
+        const email = document.getElementById('auth-email').value;
+        const password = document.getElementById('auth-password').value;
+
+        if (!email || !password) {
+            alert("Vennligst fyll ut både e-post og passord.");
+            return;
+        }
+
+        try {
+            if (type === 'signup') {
+                console.log(`[Auth] Forsøker å opprette bruker: ${email}`);
+                await createUserWithEmailAndPassword(auth, email, password);
+                alert("Bruker opprettet!");
+            } else {
+                console.log(`[Auth] Forsøker å logge inn: ${email}`);
+                await signInWithEmailAndPassword(auth, email, password);
+            }
+        } catch (error) {
+            console.error("[Auth] Feil ved e-post autentisering:", error.code, error.message);
+            alert(`Feil: ${error.message}`);
+        }
+    },
+
+    // Henting av data
     loadInitialData: async () => {
         console.log("[Data] Henter ferske data fra Firestore...");
         try {
@@ -68,7 +95,6 @@ window.app = {
         }
     },
 
-    // Oppdater UI-elementer
     populateDropdowns: () => {
         const matSelect = document.getElementById('material-select');
         const machSelect = document.getElementById('machine-select');
@@ -83,7 +109,6 @@ window.app = {
         }
     },
 
-    // Beregn pris basert på input
     calculateCurrentPrice: () => {
         const matId = document.getElementById('material-select').value;
         const amount = parseFloat(document.getElementById('amount-input').value) || 0;
@@ -96,7 +121,6 @@ window.app = {
 
         const material = materials.find(m => m.id === matId);
         if (material) {
-            // Sjekker om bruker er medlem eller drop-in
             const prisPrEnhet = currentUser?.isMember ? material.prisMedlem : material.prisDropIn;
             const total = (prisPrEnhet * amount).toFixed(2);
             document.getElementById('calculated-price').innerText = total;
@@ -105,7 +129,6 @@ window.app = {
         return 0;
     },
 
-    // Oppdater lagertabellen i UI
     renderInventory: () => {
         const tbody = document.getElementById('inventory-body');
         if (!tbody) return;
@@ -118,39 +141,30 @@ window.app = {
                     <td class="${isLow ? 'status-low' : ''}">${m.lagerantall} ${m.enhet}</td>
                     <td>M: ${m.prisMedlem} / D: ${m.prisDropIn}</td>
                     <td>${isLow ? '<span class="status-low">LITE LAGER</span>' : 'OK'}</td>
-                    <td><button class="btn-small" onclick="alert('Redigering kommer i neste versjon')">Endre</button></td>
+                    <td><button class="btn-small">Endre</button></td>
                 </tr>
             `;
         }).join('');
     },
 
-    // === HOVEDFUNKSJON: LAGRING AV BRUK ===
-    // Bruker en Firestore Transaction for å sikre at lagerbeholdningen oppdateres trygt (Race Condition Proof)
     saveUsageToDatabase: async () => {
         if (!currentPendingUsage) return;
-
         const { materialId, amount, machineId, price, timeUsed } = currentPendingUsage;
-        console.log("[Transaction] Starter lagringsprosess for:", currentPendingUsage);
 
         try {
             await runTransaction(db, async (transaction) => {
                 const materialRef = doc(db, "materials", materialId);
                 const matDoc = await transaction.get(materialRef);
 
-                if (!matDoc.exists()) {
-                    throw "Materialet eksisterer ikke i databasen!";
-                }
+                if (!matDoc.exists()) throw "Materialet eksisterer ikke!";
 
                 const nyttLagerantall = matDoc.data().lagerantall - amount;
-                
-                // 1. Oppdater lagerbeholdning
                 transaction.update(materialRef, { lagerantall: nyttLagerantall });
 
-                // 2. Lagre logg-oppføring
                 const logRef = doc(collection(db, "usage_logs"));
                 transaction.set(logRef, {
                     userId: currentUser.uid,
-                    userName: currentUser.displayName,
+                    userName: currentUser.displayName || currentUser.email,
                     materialId: materialId,
                     materialName: matDoc.data().navn,
                     machineId: machineId,
@@ -161,34 +175,49 @@ window.app = {
                 });
             });
 
-            console.log("[Transaction] Suksess! Lager oppdatert og logg lagret.");
-            alert("Bruk er registrert og lageret er oppdatert.");
+            console.log("[Transaction] Suksess.");
+            alert("Registrert!");
             document.getElementById('vipps-modal').classList.add('hidden');
             document.getElementById('usage-form').reset();
-            window.app.loadInitialData(); // Oppdaterer lista
+            window.app.loadInitialData();
 
         } catch (error) {
             console.error("[Transaction] Feilet:", error);
-            alert("Kunne ikke lagre: " + error);
+            alert("Feil: " + error);
         }
     }
 };
 
 // === EVENT LISTENERS ===
 
-// Auth
-document.getElementById('google-login-btn')?.addEventListener('click', () => signInWithPopup(auth, provider));
+// Innlogging med Google
+document.getElementById('google-login-btn')?.addEventListener('click', () => {
+    console.log("[Auth] Starter Google Login...");
+    signInWithPopup(auth, provider);
+});
+
+// E-post Innlogging
+document.getElementById('email-auth-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    window.app.handleEmailAuth('login');
+});
+
+// Opprett Bruker
+document.getElementById('signup-email-btn')?.addEventListener('click', () => {
+    window.app.handleEmailAuth('signup');
+});
+
+// Utlogging
 document.getElementById('logout-btn')?.addEventListener('click', () => signOut(auth));
 
-// Priskalkulator-trigger
+// Priskalkulator
 ['material-select', 'amount-input', 'own-material-check'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', () => window.app.calculateCurrentPrice());
 });
 
-// Skjema-innsending
+// Registrering av bruk
 document.getElementById('usage-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    
     const usageData = {
         machineId: document.getElementById('machine-select').value,
         materialId: document.getElementById('material-select').value,
@@ -196,52 +225,54 @@ document.getElementById('usage-form')?.addEventListener('submit', (e) => {
         timeUsed: parseInt(document.getElementById('time-input').value),
         price: window.app.calculateCurrentPrice()
     };
-
-    if (!usageData.machineId || !usageData.materialId || isNaN(usageData.amount)) {
-        alert("Vennligst fyll ut alle påkrevde felter.");
-        return;
-    }
-
+    if (!usageData.machineId || !usageData.materialId || isNaN(usageData.amount)) return;
     currentPendingUsage = usageData;
-
     if (usageData.price > 0) {
         document.getElementById('modal-amount').innerText = `${usageData.price} kr`;
         document.getElementById('vipps-modal').classList.remove('hidden');
     } else {
-        // Hvis prisen er 0 (eget materiale), lagre direkte
         window.app.saveUsageToDatabase();
     }
 });
 
-// Modal-handlinger
 document.querySelector('.close-modal')?.addEventListener('click', () => {
     document.getElementById('vipps-modal').classList.add('hidden');
 });
 
 document.getElementById('confirm-payment-btn')?.addEventListener('click', () => {
-    console.log("[UI] Bruker bekreftet betaling.");
     window.app.saveUsageToDatabase();
+});
+
+// CSV Eksport
+document.getElementById('export-csv-btn')?.addEventListener('click', () => {
+    let csv = "data:text/csv;charset=utf-8,Navn,Lager,Enhet,Medlem,Dropin\n";
+    materials.forEach(m => csv += `${m.navn},${m.lagerantall},${m.enhet},${m.prisMedlem},${m.prisDropIn}\n`);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csv));
+    link.setAttribute("download", "lager.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 });
 
 // === AUTH STATE OBSERVER ===
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        console.log(`[Auth] Innlogget: ${user.email}`);
+        console.log(`[Auth] Aktiv bruker: ${user.email}`);
         currentUser = user;
-        currentUser.isMember = true; // Her kan vi senere legge inn sjekk mot en 'users' collection
-        
+        currentUser.isMember = true; // Placeholder for medlemskapssjekk
         document.getElementById('auth-section').classList.add('hidden');
         document.getElementById('main-header').classList.remove('hidden');
         window.app.showSection('log-use');
         window.app.loadInitialData();
     } else {
-        console.log("[Auth] Utlogget.");
+        console.log("[Auth] Ingen bruker.");
         currentUser = null;
         document.getElementById('auth-section').classList.remove('hidden');
         document.getElementById('main-header').classList.add('hidden');
     }
 });
 
-console.log("[System] script.js Versjon #7 ferdig lastet.");
+console.log("[System] script.js Versjon #9 ferdig lastet.");
 
-/* Version: #7 */
+/* Version: #9 */
